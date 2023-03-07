@@ -137,6 +137,13 @@ while(1):
         cv.circle(img, (x_r, y_r), 5, (255, 255, 255), -1)
         cv.putText(img, "SELF", (x_r - 25, y_r - 25),cv.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
 
+    if (x_f and x_r and x_t):
+        # we can create our vectors
+        vec_self = [(x_r,y_r),(x_f,y_f)]
+        vec_path = [(x_f,y_f),(x_t,y_t)]
+
+        cv.line(img,vec_path[0],vec_path[1], (64,64,255), 2)
+        cv.putText(img, "PATH", (int((vec_path[0][0]+vec_path[1][0])/2), int((vec_path[0][1]+vec_path[1][1])/2)),cv.FONT_HERSHEY_SIMPLEX, 0.5, (64, 64, 255), 2)
 
     #create resizable windows for displaying the images
     cv.namedWindow("res", cv.WINDOW_NORMAL)
