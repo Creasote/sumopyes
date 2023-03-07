@@ -10,7 +10,7 @@ lower_S_value = 150
 upper_S_value = 255
 lower_V_value = 50
 upper_V_value = 255
-# NEED to modify S,V values per channel as generic values seem too broad
+# TODO: NEED to modify S,V values per channel as generic values seem too broad
 
 #helper fn, null callback
 def nothing(x):
@@ -31,6 +31,29 @@ def create_mask(h):
     l,u = normalise(h)
     return cv.inRange(hsv, np.array([l,lower_S_value,lower_V_value]),np.array([u,upper_S_value,upper_V_value]))
 
+# Find_CoM(mask)
+# Takes a mask (binary image) and find the centre of mass of the largest blob.
+# Returns the coordinates as int: x,y
+def find_com(mask):
+    # Find Centre of Mass of Target
+    # calculate moments of binary image
+
+    # Creating erosion kernel
+    kernel = np.ones((25, 25), np.uint8)
+  
+    # Using cv.erode() method 
+    mask = cv.erode(mask, kernel) 
+
+    target_moment = cv.moments(mask, True)
+
+    if target_moment["m00"] != 0:     # Confirm a non-zero area
+        # calculate x,y coordinate of center
+        cX = int(target_moment["m10"] / target_moment["m00"])
+        cY = int(target_moment["m01"] / target_moment["m00"])
+    else: # Blob not identified, so return a Nonetype
+            cX = cY = None
+    return cX, cY
+
 #set up work canvas
 cv.namedWindow('canvas')
 
@@ -40,11 +63,12 @@ cv.createTrackbar('Target (2)','canvas',170,180,nothing) # Target 2 (upper range
 cv.createTrackbar('Self (front)','canvas',105,255,nothing) # Self 1 (blue)
 cv.createTrackbar('Self (rear)','canvas',25,255,nothing) # Self 2 (green)
 
+# Set up Dict to hold overlay text
+object_coords = {}
 
 while(1):
     # Take each frame
     _, img = cap.read()
-    cv.imshow('canvas',img)
 
     #convert the BGR image to HSV colour space for object detection
     hsv = cv.cvtColor(img, cv.COLOR_BGR2HSV)
@@ -60,8 +84,28 @@ while(1):
     # Combine the lower and upper bound Target filters
     target_mask = cv.bitwise_or(target1_mask,target2_mask)
 
+    # Find Centre of Mass of Target
+    target_x, target_y = find_com(target_mask)
+    if (target_x):
+        object_coords["target"] = [target_x, target_y]
+    else:
+        object_coords.pop("target", None)
+
+
     self_f_mask = create_mask(cv.getTrackbarPos('Self (front)','canvas'))
+    #TODO: See if some anti-jitter is possible?
+    self_x, self_y = find_com(self_f_mask)
+    if (self_x):
+        object_coords["self_front"] = [self_x, self_y]
+    else:
+        object_coords.pop("self_front", None)
+
     self_r_mask = create_mask(cv.getTrackbarPos('Self (rear)','canvas'))
+    self_x, self_y = find_com(self_r_mask)
+    if (self_x):
+        object_coords["self_rear"] = [self_x, self_y]
+    else:
+        object_coords.pop("self_rear", None)
 
     # Combine the front and rear Self filters
     self_mask = cv.bitwise_or(self_f_mask,self_r_mask)
@@ -70,14 +114,37 @@ while(1):
     total_mask = cv.bitwise_or(self_mask,target_mask)
     res = cv.bitwise_and(img, img, mask=total_mask)
 
+    # Finally add enhancements overlay before display
+    x_t,y_t = object_coords.pop("target",[None,None])
+    if x_t:
+        # put text and highlight the center
+        cv.circle(img, (x_t, y_t), 5, (255, 255, 255), -1)
+        cv.putText(img, "TARGET", (x_t - 25, y_t - 25),cv.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+    
+    x_f,y_f = object_coords.pop("self_front",[None,None])
+    x_r,y_r = object_coords.pop("self_rear",[None,None])
+    if (x_f and x_r):
+        # print the line
+        cv.circle(img, (x_f, y_f), 5, (255, 255, 255), -1)
+        cv.putText(img, "SELF", (x_f - 25, y_f - 25),cv.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+        cv.line(img,(x_f, y_f), (x_r, y_r), (255,255,255), 2)
+    elif x_f:
+        # just put a dot for the front
+        cv.circle(img, (x_f, y_f), 5, (255, 255, 255), -1)
+        cv.putText(img, "SELF", (x_f - 25, y_f- 25),cv.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+    elif x_r:
+        # just put a dot for the rear
+        cv.circle(img, (x_r, y_r), 5, (255, 255, 255), -1)
+        cv.putText(img, "SELF", (x_r - 25, y_r - 25),cv.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+
+
     #create resizable windows for displaying the images
     cv.namedWindow("res", cv.WINDOW_NORMAL)
-    #cv.namedWindow("hsv", cv.WINDOW_NORMAL)
     cv.namedWindow("mask", cv.WINDOW_NORMAL)
 
     #display the images
     cv.imshow("mask", total_mask)
-    #cv.imshow("hsv", hsv)
+    cv.imshow('canvas',img)
     cv.imshow("res", res)
 
 
