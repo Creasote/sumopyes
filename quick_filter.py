@@ -2,11 +2,15 @@
 import cv2 as cv
 import numpy as np
 
+cap = cv.VideoCapture(0)
+
+
 hsv_range_width = 10 # The width of the range (+/-) applied to HSV values for filtering
 lower_S_value = 150
 upper_S_value = 255
 lower_V_value = 50
 upper_V_value = 255
+# NEED to modify S,V values per channel as generic values seem too broad
 
 #helper fn, null callback
 def nothing(x):
@@ -17,7 +21,6 @@ def nothing(x):
 # Returns a tuple (lower_bound, upper_bound) for Hue
 # within given range (0-180)
 def normalise(val):
-    #print("Normalising hue: ", val)
     return max(val-hsv_range_width,0),min(val+hsv_range_width, 180)
 
 # Create_Mask(h)
@@ -31,21 +34,21 @@ def create_mask(h):
 #set up work canvas
 cv.namedWindow('canvas')
 
-#read the image
-img = cv.imread("./images/colour.jpg")
-
-#convert the BGR image to HSV colour space
-hsv = cv.cvtColor(img, cv.COLOR_BGR2HSV)
-
 #create the menu / sliders
 cv.createTrackbar('Target (1)','canvas',10,180,nothing) # Target 1 (lower range red)
 cv.createTrackbar('Target (2)','canvas',170,180,nothing) # Target 2 (upper range red)
 cv.createTrackbar('Self (front)','canvas',105,255,nothing) # Self 1 (blue)
-cv.createTrackbar('Self (rear)','canvas',45,255,nothing) # Self 2 (green)
+cv.createTrackbar('Self (rear)','canvas',25,255,nothing) # Self 2 (green)
 
 
 while(1):
+    # Take each frame
+    _, img = cap.read()
     cv.imshow('canvas',img)
+
+    #convert the BGR image to HSV colour space for object detection
+    hsv = cv.cvtColor(img, cv.COLOR_BGR2HSV)
+
     k = cv.waitKey(1) & 0xFF
     if k == 27:
         break
@@ -79,25 +82,3 @@ while(1):
 
 
 cv.destroyAllWindows()
-
-
-
-
-# #create a mask for green colour using inRange function
-# mask = cv.inRange(hsv, lower_green, upper_green)
-
-# #perform bitwise and on the original image arrays using the mask
-# res = cv.bitwise_and(img, img, mask=mask)
-
-# #create resizable windows for displaying the images
-# cv.namedWindow("res", cv.WINDOW_NORMAL)
-# cv.namedWindow("hsv", cv.WINDOW_NORMAL)
-# cv.namedWindow("mask", cv.WINDOW_NORMAL)
-
-# #display the images
-# cv.imshow("mask", mask)
-# cv.imshow("hsv", hsv)
-# cv.imshow("res", res)
-
-# if cv.waitKey(0):
-#     cv.destroyAllWindows()
