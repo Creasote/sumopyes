@@ -81,10 +81,12 @@ while(1):
     # get current positions of trackbars
     # target1_mask = create_mask(cv.getTrackbarPos('Target (1)','canvas'))
     # target2_mask = create_mask(cv.getTrackbarPos('Target (2)','canvas'))
+
+    # MANUALLY create masks to reduce UI complexity. Use recal tool if necessary to find new ranges.
     target1_mask = cv.inRange(hsv, np.array([0,150,50]),np.array([20,255,255]))
     target2_mask = cv.inRange(hsv, np.array([160,150,50]),np.array([180,255,255]))
     self_f_mask = cv.inRange(hsv, np.array([50,150,50]),np.array([150,255,255]))
-    self_r_mask = cv.inRange(hsv, np.array([15,70,50]),np.array([40,150,255]))
+    self_r_mask = cv.inRange(hsv, np.array([15,70,180]),np.array([40,255,255]))
 
     # Combine the lower and upper bound Target filters
     target_mask = cv.bitwise_or(target1_mask,target2_mask)
@@ -98,19 +100,19 @@ while(1):
 
 
     # self_f_mask = create_mask(cv.getTrackbarPos('Self (front)','canvas'))
-    # #TODO: See if some anti-jitter is possible?
-    # self_x, self_y = find_com(self_f_mask)
-    # if (self_x):
-    #     object_coords["self_front"] = [self_x, self_y]
-    # else:
-    #     object_coords.pop("self_front", None)
+    #TODO: See if some anti-jitter is possible?
+    self_x, self_y = find_com(self_f_mask)
+    if (self_x):
+        object_coords["self_front"] = [self_x, self_y]
+    else:
+        object_coords.pop("self_front", None)
 
     # self_r_mask = create_mask(cv.getTrackbarPos('Self (rear)','canvas'))
-    # self_x, self_y = find_com(self_r_mask)
-    # if (self_x):
-    #     object_coords["self_rear"] = [self_x, self_y]
-    # else:
-    #     object_coords.pop("self_rear", None)
+    self_x, self_y = find_com(self_r_mask)
+    if (self_x):
+        object_coords["self_rear"] = [self_x, self_y]
+    else:
+        object_coords.pop("self_rear", None)
 
     # Combine the front and rear Self filters
     self_mask = cv.bitwise_or(self_f_mask,self_r_mask)
