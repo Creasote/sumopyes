@@ -11,7 +11,8 @@ d_value = 0.05
 pid = PID(p_value, i_value, d_value, setpoint=0)
 pid.sample_time = 0.0334
 #pid.setpoint = 0
-pid.output_limits = (-100, 100)  
+pid.output_limits = (-100, 100) 
+pid_img = np.zeros((50,50,1), np.uint8) 
 
 cap = cv.VideoCapture(0)
 
@@ -80,9 +81,9 @@ cv.createTrackbar('Self (front)','canvas',105,180,nothing) # Self 1 (blue)
 cv.createTrackbar('Self (rear)','canvas',25,180,nothing) # Self 2 (yellow)
 
 # create the PID controller adjustments
-cv.createTrackbar('P','PID Controller',1,25,nothing) # Proportional
-cv.createTrackbar('I','PID Controller',0.1,5,nothing) # Integral
-cv.createTrackbar('D','PID Controller',0.05,1,nothing) # Differential
+cv.createTrackbar('P','PID Controller',10,100,nothing) # Proportional, desired value 1, scale by factor of 10 (0.1 to 10)
+cv.createTrackbar('I','PID Controller',10,100,nothing) # Integral, desired value 0.1, scale by factor of 100 (0.01 to 1)
+cv.createTrackbar('D','PID Controller',5,100,nothing) # Differential, desired value 0.05 scale by factor of 100 (0.01 to 1)
 
 
 # Set up Dict to hold overlay text
@@ -203,14 +204,15 @@ while(1):
             motor_speed[1] = pid(angle)
 
     # Now send this to the robot
+    print("Motor settings: ", motor_speed)
             
 
     # Update PID parameters
-    p_value = cv.getTrackbarPos('P','PID Controller')
-    i_value = cv.getTrackbarPos('I','PID Controller')
-    d_value = cv.getTrackbarPos('D','PID Controller')
+    p_value = cv.getTrackbarPos('P','PID Controller')/10
+    i_value = cv.getTrackbarPos('I','PID Controller')/100
+    d_value = cv.getTrackbarPos('D','PID Controller')/100
     pid.tunings = (p_value, i_value, d_value) # updated via sliders
-    #cv.createTrackbar('D','PID Controller',0.05,1,nothing) # Differential
+    print("PID updated to: ", p_value, i_value, d_value)
 
     #create resizable windows for displaying the images
     cv.namedWindow("res", cv.WINDOW_NORMAL)
@@ -220,10 +222,10 @@ while(1):
     cv.imshow("mask", total_mask)
     cv.imshow('canvas',img)
     cv.imshow("res", res)
-    cv.imshow("PID Controller")
+    cv.imshow("PID Controller", pid_img)
 
-    fps = cap.get(cv.CAP_PROP_FPS)
-    print("Frames per second using video.get(cv2.CAP_PROP_FPS) : {0}".format(fps))
+    #fps = cap.get(cv.CAP_PROP_FPS)
+    #print("Frames per second using video.get(cv2.CAP_PROP_FPS) : {0}".format(fps))
 
 
 cv.destroyAllWindows()
