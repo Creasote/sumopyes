@@ -1,6 +1,7 @@
 #import the libraries
 import cv2 as cv
 import numpy as np
+import math
 
 cap = cv.VideoCapture(0)
 
@@ -60,8 +61,8 @@ cv.namedWindow('canvas')
 #create the menu / sliders
 cv.createTrackbar('Target (1)','canvas',10,180,nothing) # Target 1 (lower range red)
 cv.createTrackbar('Target (2)','canvas',170,180,nothing) # Target 2 (upper range red)
-cv.createTrackbar('Self (front)','canvas',105,255,nothing) # Self 1 (blue)
-cv.createTrackbar('Self (rear)','canvas',25,255,nothing) # Self 2 (green)
+cv.createTrackbar('Self (front)','canvas',105,180,nothing) # Self 1 (blue)
+cv.createTrackbar('Self (rear)','canvas',25,180,nothing) # Self 2 (green)
 
 # Set up Dict to hold overlay text
 object_coords = {}
@@ -78,8 +79,12 @@ while(1):
         break
 
     # get current positions of trackbars
-    target1_mask = create_mask(cv.getTrackbarPos('Target (1)','canvas'))
-    target2_mask = create_mask(cv.getTrackbarPos('Target (2)','canvas'))
+    # target1_mask = create_mask(cv.getTrackbarPos('Target (1)','canvas'))
+    # target2_mask = create_mask(cv.getTrackbarPos('Target (2)','canvas'))
+    target1_mask = cv.inRange(hsv, np.array([0,150,50]),np.array([20,255,255]))
+    target2_mask = cv.inRange(hsv, np.array([160,150,50]),np.array([180,255,255]))
+    self_f_mask = cv.inRange(hsv, np.array([50,150,50]),np.array([150,255,255]))
+    self_r_mask = cv.inRange(hsv, np.array([15,70,50]),np.array([40,150,255]))
 
     # Combine the lower and upper bound Target filters
     target_mask = cv.bitwise_or(target1_mask,target2_mask)
@@ -92,20 +97,20 @@ while(1):
         object_coords.pop("target", None)
 
 
-    self_f_mask = create_mask(cv.getTrackbarPos('Self (front)','canvas'))
-    #TODO: See if some anti-jitter is possible?
-    self_x, self_y = find_com(self_f_mask)
-    if (self_x):
-        object_coords["self_front"] = [self_x, self_y]
-    else:
-        object_coords.pop("self_front", None)
+    # self_f_mask = create_mask(cv.getTrackbarPos('Self (front)','canvas'))
+    # #TODO: See if some anti-jitter is possible?
+    # self_x, self_y = find_com(self_f_mask)
+    # if (self_x):
+    #     object_coords["self_front"] = [self_x, self_y]
+    # else:
+    #     object_coords.pop("self_front", None)
 
-    self_r_mask = create_mask(cv.getTrackbarPos('Self (rear)','canvas'))
-    self_x, self_y = find_com(self_r_mask)
-    if (self_x):
-        object_coords["self_rear"] = [self_x, self_y]
-    else:
-        object_coords.pop("self_rear", None)
+    # self_r_mask = create_mask(cv.getTrackbarPos('Self (rear)','canvas'))
+    # self_x, self_y = find_com(self_r_mask)
+    # if (self_x):
+    #     object_coords["self_rear"] = [self_x, self_y]
+    # else:
+    #     object_coords.pop("self_rear", None)
 
     # Combine the front and rear Self filters
     self_mask = cv.bitwise_or(self_f_mask,self_r_mask)
@@ -124,10 +129,12 @@ while(1):
     x_f,y_f = object_coords.pop("self_front",[None,None])
     x_r,y_r = object_coords.pop("self_rear",[None,None])
     if (x_f and x_r):
-        # print the line
+        # Create a vector representing SELF orientation
+        vec_self = [(x_r,y_r),(x_f,y_f)]
         cv.circle(img, (x_f, y_f), 5, (255, 255, 255), -1)
         cv.putText(img, "SELF", (x_f - 25, y_f - 25),cv.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
-        cv.line(img,(x_f, y_f), (x_r, y_r), (255,255,255), 2)
+        # print the line
+        cv.line(img,vec_self[0],vec_self[1], (255,255,255), 2)
     elif x_f:
         # just put a dot for the front
         cv.circle(img, (x_f, y_f), 5, (255, 255, 255), -1)
@@ -138,12 +145,18 @@ while(1):
         cv.putText(img, "SELF", (x_r - 25, y_r - 25),cv.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
 
     if (x_f and x_r and x_t):
-        # we can create our vectors
-        vec_self = [(x_r,y_r),(x_f,y_f)]
+        # Create a vector representing Path to Target
         vec_path = [(x_f,y_f),(x_t,y_t)]
-
         cv.line(img,vec_path[0],vec_path[1], (64,64,255), 2)
         cv.putText(img, "PATH", (int((vec_path[0][0]+vec_path[1][0])/2), int((vec_path[0][1]+vec_path[1][1])/2)),cv.FONT_HERSHEY_SIMPLEX, 0.5, (64, 64, 255), 2)
+
+        # Find the angle between them.
+        # If they are parallel, angle = 0
+        # If they are at 3 o'clock, angle = +45
+        # If they are at 9 o'clock, angle = -45
+        #float _angle = (float)Math.toDegrees(Math.atan2(x1-x, y-y1));
+        angle = math.degrees(math.atan2(vec_path[0][1]-vec_path[1][1],vec_path[0][0]-vec_path[1][0]))
+        cv.putText(img, str(angle), (10,10),cv.FONT_HERSHEY_SIMPLEX, 0.5, (64, 64, 255), 2)
 
     #create resizable windows for displaying the images
     cv.namedWindow("res", cv.WINDOW_NORMAL)
