@@ -2,16 +2,30 @@
 import cv2 as cv
 import numpy as np
 import math
+from simple_pid import PID
+
+
+p_value = 1
+i_value = 0.1
+d_value = 0.05
+pid = PID(p_value, i_value, d_value, setpoint=0)
+pid.sample_time = 0.0334
+#pid.setpoint = 0
+pid.output_limits = (-100, 100)  
 
 cap = cv.VideoCapture(0)
 
 
-hsv_range_width = 10 # The width of the range (+/-) applied to HSV values for filtering
-lower_S_value = 150
-upper_S_value = 255
-lower_V_value = 50
-upper_V_value = 255
-# TODO: NEED to modify S,V values per channel as generic values seem too broad
+# ZUMO specific components
+max_speed = 100
+motor_speed = [0,0]
+
+# Disabled as manually setting mask values
+# hsv_range_width = 10 # The width of the range (+/-) applied to HSV values for filtering
+# lower_S_value = 150
+# upper_S_value = 255
+# lower_V_value = 50
+# upper_V_value = 255
 
 #helper fn, null callback
 def nothing(x):
@@ -21,16 +35,16 @@ def nothing(x):
 #Normalise
 # Returns a tuple (lower_bound, upper_bound) for Hue
 # within given range (0-180)
-def normalise(val):
-    return max(val-hsv_range_width,0),min(val+hsv_range_width, 180)
+# def normalise(val):
+#     return max(val-hsv_range_width,0),min(val+hsv_range_width, 180)
 
 # Create_Mask(h)
 # Takes Hue value, queries and builds lower and upper bound arrays
 # then creates a mask using inRange on the HSV image.
 # Note: All use same S (150-255) and V (50-255) range 
-def create_mask(h):
-    l,u = normalise(h)
-    return cv.inRange(hsv, np.array([l,lower_S_value,lower_V_value]),np.array([u,upper_S_value,upper_V_value]))
+# def create_mask(h):
+#     l,u = normalise(h)
+#     return cv.inRange(hsv, np.array([l,lower_S_value,lower_V_value]),np.array([u,upper_S_value,upper_V_value]))
 
 # Find_CoM(mask)
 # Takes a mask (binary image) and find the centre of mass of the largest blob.
@@ -57,12 +71,19 @@ def find_com(mask):
 
 #set up work canvas
 cv.namedWindow('canvas')
+cv.namedWindow('PID Controller')
 
 #create the menu / sliders
 cv.createTrackbar('Target (1)','canvas',10,180,nothing) # Target 1 (lower range red)
 cv.createTrackbar('Target (2)','canvas',170,180,nothing) # Target 2 (upper range red)
 cv.createTrackbar('Self (front)','canvas',105,180,nothing) # Self 1 (blue)
-cv.createTrackbar('Self (rear)','canvas',25,180,nothing) # Self 2 (green)
+cv.createTrackbar('Self (rear)','canvas',25,180,nothing) # Self 2 (yellow)
+
+# create the PID controller adjustments
+cv.createTrackbar('P','PID Controller',1,25,nothing) # Proportional
+cv.createTrackbar('I','PID Controller',0.1,5,nothing) # Integral
+cv.createTrackbar('D','PID Controller',0.05,1,nothing) # Differential
+
 
 # Set up Dict to hold overlay text
 object_coords = {}
@@ -146,6 +167,10 @@ while(1):
         cv.circle(img, (x_r, y_r), 5, (255, 255, 255), -1)
         cv.putText(img, "SELF", (x_r - 25, y_r - 25),cv.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
 
+    # Reset speeds to zero
+    motor_speed[0] = 0
+    motor_speed[1] = 0
+
     if (x_f and x_r and x_t):
         # Create a vector representing Path to Target
         vec_path = [(x_f,y_f),(x_t,y_t)]
@@ -160,6 +185,33 @@ while(1):
         angle = math.degrees(math.atan2(vec_path[0][1]-vec_path[1][1],vec_path[0][0]-vec_path[1][0]))
         cv.putText(img, str(angle), (10,10),cv.FONT_HERSHEY_SIMPLEX, 0.5, (64, 64, 255), 2)
 
+        # Using the angle, determine commands for the robot
+        # Depending on the magnitude either: 
+        # < |45| - inside wheel speed = 0; scale: 0->45 : 100%->0%
+        # > |45| - inside wheel speed => negative; scale: 45->180 : 0%->-100%
+        # 
+        #if angle < -45:
+        # Target found
+        if (angle < -5): # target is to the left
+            motor_speed[0] = pid(angle)
+            motor_speed[1] = max_speed
+        elif (angle < 5):
+            motor_speed[0] = max_speed
+            motor_speed[1] = max_speed
+        else:
+            motor_speed[0] = max_speed
+            motor_speed[1] = pid(angle)
+
+    # Now send this to the robot
+            
+
+    # Update PID parameters
+    p_value = cv.getTrackbarPos('P','PID Controller')
+    i_value = cv.getTrackbarPos('I','PID Controller')
+    d_value = cv.getTrackbarPos('D','PID Controller')
+    pid.tunings = (p_value, i_value, d_value) # updated via sliders
+    #cv.createTrackbar('D','PID Controller',0.05,1,nothing) # Differential
+
     #create resizable windows for displaying the images
     cv.namedWindow("res", cv.WINDOW_NORMAL)
     cv.namedWindow("mask", cv.WINDOW_NORMAL)
@@ -168,6 +220,10 @@ while(1):
     cv.imshow("mask", total_mask)
     cv.imshow('canvas',img)
     cv.imshow("res", res)
+    cv.imshow("PID Controller")
+
+    fps = cap.get(cv.CAP_PROP_FPS)
+    print("Frames per second using video.get(cv2.CAP_PROP_FPS) : {0}".format(fps))
 
 
 cv.destroyAllWindows()
