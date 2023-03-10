@@ -3,23 +3,28 @@ import cv2 as cv
 import numpy as np
 import math
 from simple_pid import PID
+import com
 
 
+cap = cv.VideoCapture(0)
+
+#TODO: Modify range of motors because we can only send a single 8 bit byte.
+# Suggest to encode: motor speed as LS 6 bits (0-63), the next most significant bit (7) for motor indicator
+# # (0 for left, 1 for right). Finally, the MSB (8) is a flag to indicate whether this is a motor speed update
+#  (1) or something else (0), TBD. Easily filtered on the receiving end.
+# ZUMO specific components
+max_speed = 31  # We set a max speed of 31. This is scaled on receipt to the robot maximum of 400.
+motor_speed = [0,0]
+
+
+# Initialise PID controller. Variables can be tuned at run-time.
 p_value = 1
 i_value = 0.1
 d_value = 0.05
 pid = PID(p_value, i_value, d_value, setpoint=0)
-pid.sample_time = 0.0334
-#pid.setpoint = 0
-pid.output_limits = (-100, 100) 
+pid.sample_time = 0.0334 # 30 FPS. Update if camera changes.
+pid.output_limits = (-max_speed, max_speed) 
 pid_img = np.zeros((50,50,1), np.uint8) 
-
-cap = cv.VideoCapture(0)
-
-
-# ZUMO specific components
-max_speed = 100
-motor_speed = [0,0]
 
 # Disabled as manually setting mask values
 # hsv_range_width = 10 # The width of the range (+/-) applied to HSV values for filtering
@@ -191,7 +196,10 @@ while(1):
         # < |45| - inside wheel speed = 0; scale: 0->45 : 100%->0%
         # > |45| - inside wheel speed => negative; scale: 45->180 : 0%->-100%
         # 
-        #if angle < -45:
+        #TODO: This doesn't feel right. The controller should consistently control the motors,
+        # not swap backwards and forwards. Suggest setting both motors to MAX_SPEED, and then
+        # if PID is -ve, subtract the value from the left motor, and if it is +ve subtract from the right. 
+        # This feels more consistent, and less likely to "confuse" the feedback mechanism.
         # Target found
         if (angle < -5): # target is to the left
             motor_speed[0] = pid(angle)
@@ -200,11 +208,13 @@ while(1):
             motor_speed[0] = max_speed
             motor_speed[1] = max_speed
         else:
-            motor_speed[0] = max_speed
+            motor_speed[0] = max_speed # target is to the right
             motor_speed[1] = pid(angle)
 
     # Now send this to the robot
     print("Motor settings: ", motor_speed)
+    com.send_speed(motor_speed)
+    print(com.read())
             
 
     # Update PID parameters
