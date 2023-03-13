@@ -32,7 +32,7 @@ while(1):
     #convert the BGR image to HSV colour space for object detection
     hsv = cv.cvtColor(img, cv.COLOR_BGR2HSV)
 
-    k = cv.waitKey(1) & 0xFF
+    k = cv.waitKey(10) & 0xFF
     if k == 27:
         break
 
