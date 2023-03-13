@@ -4,7 +4,7 @@ import numpy as np
 import math
 from simple_pid import PID
 import com
-
+import time
 
 cap = cv.VideoCapture(0)
 
@@ -13,8 +13,9 @@ cap = cv.VideoCapture(0)
 # # (0 for left, 1 for right). Finally, the MSB (8) is a flag to indicate whether this is a motor speed update
 #  (1) or something else (0), TBD. Easily filtered on the receiving end.
 # ZUMO specific components
-max_speed = 63  # We set a max speed of 31. This is scaled on receipt to the robot maximum of 400.
-motor_speed = [0,0]
+max_speed = 100  # We set a max speed of 100. This is scaled on receipt to the robot maximum of 400.
+zero_point = 0 # What is the motor zero speed?
+motor_speed = [zero_point, zero_point]
 
 
 # Initialise PID controller. Variables can be tuned at run-time.
@@ -75,15 +76,28 @@ def find_com(mask):
             cX = cY = None
     return cX, cY
 
-#set up work canvas
-cv.namedWindow('canvas')
+#set up work SumoPyes
+cv.namedWindow('SumoPyes')
 cv.namedWindow('PID Controller')
+cv.namedWindow('Target')
+cv.namedWindow('Self')
 
 #create the menu / sliders
-cv.createTrackbar('Target (1)','canvas',10,180,nothing) # Target 1 (lower range red)
-cv.createTrackbar('Target (2)','canvas',170,180,nothing) # Target 2 (upper range red)
-cv.createTrackbar('Self (front)','canvas',105,180,nothing) # Self 1 (blue)
-cv.createTrackbar('Self (rear)','canvas',25,180,nothing) # Self 2 (yellow)
+cv.createTrackbar('Target Hue (1) from','Target',0,180,nothing) # Target 1 (lower range red)
+cv.createTrackbar('Target Hue (1) to','Target',20,180,nothing) # Target 1 (lower range red)
+cv.createTrackbar('Target Sat (1) from','Target',150,255,nothing) # Target 1 (lower range red)
+cv.createTrackbar('Target Sat (1) to','Target',255,255,nothing) # Target 1 (lower range red)
+cv.createTrackbar('Target Val (1) from','Target',50,255,nothing) # Target 1 (lower range red)
+cv.createTrackbar('Target Val (1) to','Target',255,255,nothing) # Target 1 (lower range red)
+cv.createTrackbar('Target Hue (2) from','Target',160,180,nothing) # Target 1 (lower range red)
+cv.createTrackbar('Target Hue (2) to','Target',180,180,nothing) # Target 1 (lower range red)
+cv.createTrackbar('Target Sat (2) from','Target',150,255,nothing) # Target 1 (lower range red)
+cv.createTrackbar('Target Sat (2) to','Target',255,255,nothing) # Target 1 (lower range red)
+cv.createTrackbar('Target Val (2) from','Target',50,255,nothing) # Target 1 (lower range red)
+cv.createTrackbar('Target Val (2) to','Target',255,255,nothing) # Target 1 (lower range red)
+
+cv.createTrackbar('Self (rear)','Self',105,180,nothing) # Self 1 (blue)
+cv.createTrackbar('Self (front)','Self',25,180,nothing) # Self 2 (yellow)
 
 # create the PID controller adjustments
 cv.createTrackbar('P','PID Controller',10,100,nothing) # Proportional, desired value 1, scale by factor of 10 (0.1 to 10)
@@ -106,14 +120,15 @@ while(1):
         break
 
     # get current positions of trackbars
-    # target1_mask = create_mask(cv.getTrackbarPos('Target (1)','canvas'))
-    # target2_mask = create_mask(cv.getTrackbarPos('Target (2)','canvas'))
+    # target1_mask = create_mask(cv.getTrackbarPos('Target (1)','SumoPyes'))
+    # target2_mask = create_mask(cv.getTrackbarPos('Target (2)','SumoPyes'))
 
     # MANUALLY create masks to reduce UI complexity. Use recal tool if necessary to find new ranges.
     target1_mask = cv.inRange(hsv, np.array([0,150,50]),np.array([20,255,255]))
     target2_mask = cv.inRange(hsv, np.array([160,150,50]),np.array([180,255,255]))
-    self_f_mask = cv.inRange(hsv, np.array([50,150,50]),np.array([150,255,255]))
-    self_r_mask = cv.inRange(hsv, np.array([15,70,180]),np.array([40,255,255]))
+    self_r_mask = cv.inRange(hsv, np.array([50,150,50]),np.array([150,255,255])) # blue
+    # self_f_mask = cv.inRange(hsv, np.array([15,0,215]),np.array([40,255,255])) # yellow
+    self_f_mask = cv.inRange(hsv, np.array([15,70,180]),np.array([40,255,255])) # yellow
 
     # Combine the lower and upper bound Target filters
     target_mask = cv.bitwise_or(target1_mask,target2_mask)
@@ -126,7 +141,7 @@ while(1):
         object_coords.pop("target", None)
 
 
-    # self_f_mask = create_mask(cv.getTrackbarPos('Self (front)','canvas'))
+    # self_f_mask = create_mask(cv.getTrackbarPos('Self (front)','SumoPyes'))
     #TODO: See if some anti-jitter is possible?
     self_x, self_y = find_com(self_f_mask)
     if (self_x):
@@ -134,7 +149,7 @@ while(1):
     else:
         object_coords.pop("self_front", None)
 
-    # self_r_mask = create_mask(cv.getTrackbarPos('Self (rear)','canvas'))
+    # self_r_mask = create_mask(cv.getTrackbarPos('Self (rear)','SumoPyes'))
     self_x, self_y = find_com(self_r_mask)
     if (self_x):
         object_coords["self_rear"] = [self_x, self_y]
@@ -173,9 +188,9 @@ while(1):
         cv.circle(img, (x_r, y_r), 5, (255, 255, 255), -1)
         cv.putText(img, "SELF", (x_r - 25, y_r - 25),cv.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
 
-    # Reset speeds to zero (scaled to 32, the zero/mid-point of 0-63 range)
-    motor_speed[0] = 32
-    motor_speed[1] = 32
+    # Reset speeds to zero
+    motor_speed[0] = zero_point
+    motor_speed[1] = zero_point
 
     if (x_f and x_r and x_t):
         # Create a vector representing Path to Target
@@ -187,8 +202,15 @@ while(1):
         # If they are parallel, angle = 0
         # If they are at 3 o'clock, angle = +45
         # If they are at 9 o'clock, angle = -45
-        angle = math.degrees(math.atan2(vec_path[0][1]-vec_path[1][1],vec_path[0][0]-vec_path[1][0]))
+        # angle = math.degrees(math.atan2(vec_path[0][1]-vec_path[1][1],vec_path[0][0]-vec_path[1][0]))
+        path_angle = math.degrees(math.atan2(vec_path[0][1]-vec_path[1][1],vec_path[0][0]-vec_path[1][0]))
+        robot_angle = math.degrees(math.atan2(y_f-y_r, x_f-x_r))
+        angle = (180 + robot_angle)%180 - (180+path_angle)%180
+        # print("Angles: robot: ", robot_angle)
+        # print(" path: ", path_angle)
+        print(" vector: ", angle)
         cv.putText(img, str(angle), (10,10),cv.FONT_HERSHEY_SIMPLEX, 0.5, (64, 64, 255), 2)
+        # time.sleep(0.5)
 
         # Using the angle, determine commands for the robot
         # 
@@ -205,9 +227,9 @@ while(1):
             motor_speed[1] = max_speed + output 
 
     # Now send this to the robot
-    # print("Motor settings: ", motor_speed)
+    print("Motor settings: ", motor_speed)
     com.send_speed(motor_speed)
-    print(com.read())
+    print("From robot: ",com.read())
             
 
     # Update PID parameters
@@ -221,10 +243,16 @@ while(1):
     cv.namedWindow("res", cv.WINDOW_NORMAL)
     cv.namedWindow("mask", cv.WINDOW_NORMAL)
 
+    #
+    target_display = cv.bitwise_and(img, img, mask=target_mask)
+    self_display = cv.bitwise_and(img, img, mask=self_mask)
+
     #display the images
     cv.imshow("mask", total_mask)
-    cv.imshow('canvas',img)
+    cv.imshow('SumoPyes',img)
     cv.imshow("res", res)
+    cv.imshow("Target", target_display)
+    cv.imshow("Self", self_display)
     cv.imshow("PID Controller", pid_img)
 
     #fps = cap.get(cv.CAP_PROP_FPS)

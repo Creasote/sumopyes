@@ -2,6 +2,7 @@ import serial
 import time
 
 robot=serial.Serial('/dev/ttyS2', 9600)
+#robot=serial.Serial('/dev/ttyS3', 9600)
 time.sleep(2)
 
 left_motorspeed_mask = 0b10000000
@@ -16,17 +17,25 @@ def send_speed(var):
     # motor speed commands. Set the second MSB (7) to 0 for the left motor, and to
     # 1 for the right motor. Then combine with the motor speeds and send. 
     left_speed = int(var[0])
-    left_speed = left_speed | left_motorspeed_mask
-    write = robot.write(bytes(chr(left_speed),'utf-8'))
-    if (write != 1):
-        print ("LEFT Bytes sent: ", write)
+    # left_speed = left_speed | left_motorspeed_mask
+    print("Sending (L): ", left_speed)
+    # write = robot.write(bytes(chr(left_speed),'utf-8'))
+    # if (write != 1):
+    #     print ("LEFT Bytes sent: ", write)
     right_speed = int(var[1])
-    right_speed = right_speed | right_motorspeed_mask
-    write = robot.write(bytes(chr(right_speed),'utf-8'))
-    if (write != 1):
-        print ("RIGHT Bytes sent: ", write)
+    # right_speed = right_speed | right_motorspeed_mask
+    print("Sending (R): ", right_speed)
+    # write = robot.write(bytes(chr(right_speed),'utf-8'))
+    # if (write != 1):
+    #     print ("RIGHT Bytes sent: ", write)
+    write = robot.write(bytes(str(var),'ASCII'))
+    print(" Sending: ", var)
+    robot.flush() # Send the data asap, no buffering.
+    time.sleep(0.1)
+    # robot.read_all()
     return
 
 def read():
+    # time.sleep(0.1)
     return robot.read_all()
 
