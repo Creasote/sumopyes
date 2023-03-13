@@ -13,7 +13,7 @@ cap = cv.VideoCapture(0)
 # # (0 for left, 1 for right). Finally, the MSB (8) is a flag to indicate whether this is a motor speed update
 #  (1) or something else (0), TBD. Easily filtered on the receiving end.
 # ZUMO specific components
-max_speed = 31  # We set a max speed of 31. This is scaled on receipt to the robot maximum of 400.
+max_speed = 63  # We set a max speed of 31. This is scaled on receipt to the robot maximum of 400.
 motor_speed = [0,0]
 
 
@@ -173,9 +173,9 @@ while(1):
         cv.circle(img, (x_r, y_r), 5, (255, 255, 255), -1)
         cv.putText(img, "SELF", (x_r - 25, y_r - 25),cv.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
 
-    # Reset speeds to zero
-    motor_speed[0] = 0
-    motor_speed[1] = 0
+    # Reset speeds to zero (scaled to 32, the zero/mid-point of 0-63 range)
+    motor_speed[0] = 32
+    motor_speed[1] = 32
 
     if (x_f and x_r and x_t):
         # Create a vector representing Path to Target
@@ -187,32 +187,25 @@ while(1):
         # If they are parallel, angle = 0
         # If they are at 3 o'clock, angle = +45
         # If they are at 9 o'clock, angle = -45
-        #float _angle = (float)Math.toDegrees(Math.atan2(x1-x, y-y1));
         angle = math.degrees(math.atan2(vec_path[0][1]-vec_path[1][1],vec_path[0][0]-vec_path[1][0]))
         cv.putText(img, str(angle), (10,10),cv.FONT_HERSHEY_SIMPLEX, 0.5, (64, 64, 255), 2)
 
         # Using the angle, determine commands for the robot
-        # Depending on the magnitude either: 
-        # < |45| - inside wheel speed = 0; scale: 0->45 : 100%->0%
-        # > |45| - inside wheel speed => negative; scale: 45->180 : 0%->-100%
         # 
-        #TODO: This doesn't feel right. The controller should consistently control the motors,
-        # not swap backwards and forwards. Suggest setting both motors to MAX_SPEED, and then
-        # if PID is -ve, subtract the value from the left motor, and if it is +ve subtract from the right. 
-        # This feels more consistent, and less likely to "confuse" the feedback mechanism.
+        #Sets both motors to MAX_SPEED, and then if PID is -ve, subtract the value from 
+        # the left motor, and if it is +ve subtract from the right. 
+        #
         # Target found
-        if (angle < -5): # target is to the left
-            motor_speed[0] = pid(angle)
-            motor_speed[1] = max_speed
-        elif (angle < 5):
-            motor_speed[0] = max_speed
-            motor_speed[1] = max_speed
-        else:
-            motor_speed[0] = max_speed # target is to the right
-            motor_speed[1] = pid(angle)
+        output = pid(angle)
+        if output > 0: 
+            motor_speed[0] = max_speed - output
+            motor_speed[1] = max_speed   
+        else: 
+            motor_speed[0] = max_speed 
+            motor_speed[1] = max_speed + output 
 
     # Now send this to the robot
-    print("Motor settings: ", motor_speed)
+    # print("Motor settings: ", motor_speed)
     com.send_speed(motor_speed)
     print(com.read())
             
