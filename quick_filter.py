@@ -58,6 +58,7 @@ d_value = config["d_value"] #0.05
 pid = PID(p_value, i_value, d_value, setpoint=0)
 pid.sample_time = 0.0334 # 30 FPS. Update if camera changes.
 pid.output_limits = (-max_speed, max_speed) 
+MAX_ANGLE = 135 # Constraint on the maximum magnitude of angle fed to the PID (degrees)
 pid_img = np.zeros((50,50,1), np.uint8) 
 
 # Disabled as manually setting mask values
@@ -71,6 +72,9 @@ pid_img = np.zeros((50,50,1), np.uint8)
 def nothing(x):
     pass
 
+# Constrain applies upper and lower bounds to a value
+def constrain(val, min_val, max_val):
+    return min(max_val, max(min_val, val))
 
 #Normalise
 # Returns a tuple (lower_bound, upper_bound) for Hue
@@ -274,16 +278,21 @@ while(1):
 
         # Find the angle between them.
         # If they are parallel, angle = 0
-        # If they are at 3 o'clock, angle = +45
-        # If they are at 9 o'clock, angle = -45
+        # If they are at 3 o'clock, angle = -45
+        # If they are at 9 o'clock, angle = +45
         # angle = math.degrees(math.atan2(vec_path[0][1]-vec_path[1][1],vec_path[0][0]-vec_path[1][0]))
-        path_angle = math.degrees(math.atan2(vec_path[0][1]-vec_path[1][1],vec_path[0][0]-vec_path[1][0]))
+        # path_angle = math.degrees(math.atan2(vec_path[0][1]-vec_path[1][1],vec_path[0][0]-vec_path[1][0]))
+        path_angle = math.degrees(math.atan2(vec_path[1][1]-vec_path[0][1],vec_path[1][0]-vec_path[0][0]))
         robot_angle = math.degrees(math.atan2(y_f-y_r, x_f-x_r))
-        angle = (180 + robot_angle)%180 - (180+path_angle)%180
+        # robot_angle = math.degrees(math.atan2(y_r-y_f, x_r-x_f))
         # print("Angles: robot: ", robot_angle)
         # print(" path: ", path_angle)
+        angle = path_angle - robot_angle
+        angle = (angle + 180) % 360 - 180
         print(" vector: ", angle)
         cv.putText(img, str(angle), (10,10),cv.FONT_HERSHEY_SIMPLEX, 0.5, (64, 64, 255), 2)
+        cv.putText(img, str(robot_angle), (10,30),cv.FONT_HERSHEY_SIMPLEX, 0.5, (255, 64, 64), 2)
+        cv.putText(img, str(path_angle), (10,50),cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
         # time.sleep(0.5)
 
         # Using the angle, determine commands for the robot
@@ -292,6 +301,7 @@ while(1):
         # the left motor, and if it is +ve subtract from the right. 
         #
         # Target found
+        # output = constrain(pid(angle),-MAX_ANGLE,MAX_ANGLE)
         output = pid(angle)
         if output > 0: 
             motor_speed[0] = max_speed - output
