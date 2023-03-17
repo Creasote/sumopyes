@@ -98,7 +98,7 @@ def find_com(mask):
     # calculate moments of binary image
 
     # Creating erosion kernel
-    kernel = np.ones((25, 25), np.uint8)
+    kernel = np.ones((5, 5), np.uint8)
   
     # Using cv.erode() method 
     mask = cv.erode(mask, kernel) 
