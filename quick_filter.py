@@ -131,6 +131,10 @@ cv.namedWindow('PID Controller')
 cv.namedWindow('Target')
 cv.namedWindow('Self')
 
+# create switch for ON/OFF functionality
+enabled = '0 : OFF \n1 : ON'
+cv.createTrackbar(enabled, 'SumoPyes',0,1,nothing)
+
 #create the menu / sliders
 cv.createTrackbar('Target Hue (1) from','Target',t1_h_f,180,nothing) # Target 1 (lower range red)
 cv.createTrackbar('Target Hue (1) to','Target',t1_h_t,180,nothing) # Target 1 (lower range red)
@@ -319,15 +323,17 @@ while(1):
         else:
             output = angle
 
-        if output > 0: 
-            motor_speed[0] = max_speed - output
-            motor_speed[1] = max_speed   
-        else: 
-            motor_speed[0] = max_speed 
-            motor_speed[1] = max_speed + output 
-
-        # else:  
-        #     motor_speed = linear_speed(angle)
+        Enabled = cv.getTrackbarPos(enabled,'SumoPyes')
+        if (Enabled == 1):
+            if output > 0: 
+                motor_speed[0] = max_speed - output
+                motor_speed[1] = max_speed   
+            else: 
+                motor_speed[0] = max_speed 
+                motor_speed[1] = max_speed + output 
+        else:  
+            motor_speed[0] = 0
+            motor_speed[1] = 0
 
         
 
