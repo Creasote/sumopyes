@@ -60,6 +60,7 @@ pid.sample_time = 0.0334 # 30 FPS. Update if camera changes.
 pid.output_limits = (-max_speed, max_speed) 
 MAX_ANGLE = 135 # Constraint on the maximum magnitude of angle fed to the PID (degrees)
 pid_img = np.zeros((50,50,1), np.uint8) 
+USE_PID = False
 
 # Disabled as manually setting mask values
 # hsv_range_width = 10 # The width of the range (+/-) applied to HSV values for filtering
@@ -75,6 +76,17 @@ def nothing(x):
 # Constrain applies upper and lower bounds to a value
 def constrain(val, min_val, max_val):
     return min(max_val, max(min_val, val))
+
+def linear_speed(angle):
+    if angle < 0:
+        # angle is negative, so the target is to the left
+        motor_speed[0] = max_speed + angle
+        motor_speed[1] = max_speed
+    else:
+        # angle is positive, so the target is to the right
+        motor_speed[0] = max_speed
+        motor_speed[1] = max_speed - angle
+    return motor_speed
 
 #Normalise
 # Returns a tuple (lower_bound, upper_bound) for Hue
@@ -302,13 +314,22 @@ while(1):
         #
         # Target found
         # output = constrain(pid(angle),-MAX_ANGLE,MAX_ANGLE)
-        output = pid(angle)
+        if USE_PID:
+            output = pid(angle)
+        else:
+            output = angle
+
         if output > 0: 
             motor_speed[0] = max_speed - output
             motor_speed[1] = max_speed   
         else: 
             motor_speed[0] = max_speed 
             motor_speed[1] = max_speed + output 
+
+        # else:  
+        #     motor_speed = linear_speed(angle)
+
+        
 
     # Now send this to the robot
     print("Motor settings: ", motor_speed)
