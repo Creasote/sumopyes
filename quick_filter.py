@@ -60,7 +60,7 @@ pid.sample_time = 0.0334 # 30 FPS. Update if camera changes.
 pid.output_limits = (-max_speed, max_speed) 
 MAX_ANGLE = 135 # Constraint on the maximum magnitude of angle fed to the PID (degrees)
 pid_img = np.zeros((50,50,1), np.uint8) 
-USE_PID = False
+USE_PID = True
 
 # Disabled as manually setting mask values
 # hsv_range_width = 10 # The width of the range (+/-) applied to HSV values for filtering
@@ -319,6 +319,7 @@ while(1):
         # Target found
         # output = constrain(pid(angle),-MAX_ANGLE,MAX_ANGLE)
         if USE_PID:
+            pid.auto_mode = True
             output = pid(angle)
         else:
             output = angle
@@ -335,6 +336,8 @@ while(1):
             motor_speed[0] = 0
             motor_speed[1] = 0
 
+    else:
+        pid.auto_mode = False
         
 
     # Now send this to the robot
